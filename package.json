@@ -1,0 +1,43 @@
+{
+  "name": "markerlayer",
+  "version": "0.2.2",
+  "description": "Deterministic reference implementation of the EN 18144:2025 behavioural markers of harm for online gambling",
+  "license": "MIT",
+  "author": "DUOMIND S.R.L.",
+  "homepage": "https://markerlayer.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/markerlayer/markerlayer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/markerlayer/markerlayer/issues"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "SPEC.md",
+    "openapi.yaml",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "serve": "tsx src/server/main.ts"
+  },
+  "keywords": [
+    "responsible-gambling",
+    "markers-of-harm",
+    "EN18144",
+    "player-protection",
+    "safer-gambling"
+  ],
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.10"
+  }
+}

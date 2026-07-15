@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarkerLayer Cloud — compliance console (demo)</title>
+<!-- Demo console rendering locally generated synthetic data (data/results.js).
+     No user input or external content is ever rendered. -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F4EF;--paper-deep:#EFECE4;--ink:#14212B;--ink-soft:#41505C;--ink-faint:#8A95A0;
+  --rule:#D9D4C8;--accent:#16655A;--accent-deep:#0E4A42;--amber:#B7791F;--red:#A4372E;--card:#FFF;
+  --mono:'IBM Plex Mono',monospace;--serif:'Newsreader',serif;--sans:'Archivo',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:14px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+
+header{background:var(--ink);color:#DCE3E8;padding:14px 0}
+header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:baseline;gap:10px;font-weight:600;font-size:17px}
+.brand em{font-style:normal;color:#5BC4B3}
+.brand .tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:#8FA0AD;border:1px solid #33424E;padding:2px 8px;border-radius:2px}
+.opmeta{font-family:var(--mono);font-size:11px;color:#8FA0AD;text-align:right;line-height:1.7}
+.opmeta b{color:#DCE3E8;font-weight:500}
+
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:26px 0}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:16px 18px}
+.kpi .n{font-family:var(--serif);font-size:32px;font-weight:500;line-height:1}
+.kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:8px}
+.kpi.hi .n{color:var(--red)}.kpi.mid .n{color:var(--amber)}.kpi.lo .n{color:var(--accent)}
+
+.controls{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:11.5px;padding:7px 14px;border:1px solid var(--rule);border-radius:2px;background:var(--card);cursor:pointer;color:var(--ink-soft)}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#q{font-family:var(--mono);font-size:12px;padding:8px 12px;border:1px solid var(--rule);border-radius:2px;background:var(--card);width:200px;outline:none}
+#q:focus{border-color:var(--accent)}
+.controls .note{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-left:auto}
+
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--rule)}
+th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);text-align:left;padding:10px 14px;border-bottom:1px solid var(--rule);background:var(--paper-deep)}
+td{padding:11px 14px;border-bottom:1px solid var(--rule);vertical-align:middle}
+tr.row{cursor:pointer}
+tr.row:hover td{background:#FBFAF7}
+tr.row.sel td{background:#F0F7F5}
+.pid{font-family:var(--mono);font-size:12.5px;font-weight:500}
+.arch{font-family:var(--mono);font-size:10px;color:var(--ink-faint)}
+.band{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;padding:3px 10px;border-radius:2px;display:inline-block}
+.band.high{background:#F6E4E1;color:var(--red)}
+.band.moderate{background:#F5EAD8;color:var(--amber)}
+.band.low{background:#E3EFEC;color:var(--accent-deep)}
+.score{font-family:var(--serif);font-size:19px;font-weight:500}
+.mstrip{display:flex;gap:3px}
+.mcell{width:16px;height:16px;border-radius:2px;font-family:var(--mono);font-size:7.5px;display:flex;align-items:center;justify-content:center;color:#fff;background:#D8DDD9}
+.mcell.normal{background:#C9D6D2;color:#5E7470}
+.mcell.elevated{background:var(--amber)}
+.mcell.high{background:var(--red)}
+.mcell.insufficient_data{background:#EAE7DF;color:#B0A995}
+.bl{font-family:var(--mono);font-size:10px;color:var(--ink-faint)}
+
+/* detail drawer */
+#drawer{position:fixed;top:0;right:-680px;width:660px;max-width:95vw;height:100vh;background:var(--paper);border-left:1px solid var(--rule);box-shadow:-24px 0 60px -30px rgba(20,33,43,.35);transition:right .25s ease;overflow-y:auto;z-index:60}
+#drawer.open{right:0}
+.dhead{background:var(--ink);color:#DCE3E8;padding:20px 26px;position:sticky;top:0;z-index:2}
+.dhead .top{display:flex;justify-content:space-between;align-items:center}
+.dhead h2{font-family:var(--mono);font-size:16px;font-weight:500}
+.dhead .x{cursor:pointer;font-size:20px;color:#8FA0AD;background:none;border:none}
+.dhead .sub{font-family:var(--mono);font-size:11px;color:#8FA0AD;margin-top:6px}
+.dbody{padding:22px 26px 40px}
+.comp{background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:18px;margin-bottom:18px}
+.comp .row1{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.comp .cs{font-family:var(--serif);font-size:34px;font-weight:500}
+.pts{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.9}
+.pts b{color:var(--ink);font-weight:500}
+.spark{background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:14px 18px;margin-bottom:18px}
+.spark .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+.mk{background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:14px 16px;margin-bottom:10px}
+.mk .h{display:flex;justify-content:space-between;align-items:center}
+.mk .nm{font-weight:600;font-size:13.5px}
+.mk .cl{font-family:var(--mono);font-size:10px;color:var(--accent)}
+.ev{font-family:var(--mono);font-size:11px;color:#7A5B1E;background:#FBF4E7;border-left:2px solid var(--amber);padding:8px 10px;margin-top:8px;line-height:1.6}
+.mk.state-high .ev{color:#7C2C25;background:#F9ECEA;border-color:var(--red)}
+.miss{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:8px}
+.prot{font-family:var(--mono);font-size:11px;color:var(--accent-deep);background:#E9F2EF;border-left:2px solid var(--accent);padding:8px 10px;margin-bottom:18px}
+.note{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-bottom:16px}
+footer{margin:34px 0 40px;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">Marker<em>Layer</em> Cloud <span class="tag">PILOT PREVIEW · SYNTHETIC DATA</span></div>
+    <div class="opmeta" id="opmeta"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
+  <div class="controls">
+    <button class="chip on" data-band="all">All</button>
+    <button class="chip" data-band="high">High</button>
+    <button class="chip" data-band="moderate">Moderate</button>
+    <button class="chip" data-band="low">Low</button>
+    <input id="q" placeholder="search player id…">
+    <span class="note">sorted by composite score · click a row for evidence</span>
+  </div>
+  <table>
+    <thead><tr><th>Player</th><th>Band</th><th>Score</th><th>Markers M1–M9</th><th>Baseline</th><th>Events</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <footer>MarkerLayer Cloud — demonstration console on synthetic data (seed 18144). Every number is reproducible from the event log. A Duomind product.</footer>
+</div>
+
+<aside id="drawer">
+  <div class="dhead">
+    <div class="top"><h2 id="dpid"></h2><button class="x" onclick="closeD()">×</button></div>
+    <div class="sub" id="dsub"></div>
+  </div>
+  <div class="dbody" id="dbody"></div>
+</aside>
+
+<script src="data/results.js"></script>
+<script>
+// All rendered values originate from data/results.js, generated locally by
+// demo/generate.ts from synthetic events — there is no untrusted input.
+const D = window.DEMO_DATA;
+const MIDS = ["M1_volume_of_stakes","M2_speed_of_play","M3_depositing_behaviour","M4_cancelled_withdrawals","M5_player_initiated_contact","M6_gambling_time","M7_gambling_products","M8_responsible_gambling_tools","M9_losses"];
+const MNAMES = {M1_volume_of_stakes:"Volume of Stakes",M2_speed_of_play:"Speed of Play",M3_depositing_behaviour:"Depositing Behaviour",M4_cancelled_withdrawals:"Cancelled Withdrawals",M5_player_initiated_contact:"Player Initiated Contact",M6_gambling_time:"Gambling Time",M7_gambling_products:"Gambling Products",M8_responsible_gambling_tools:"Responsible Gambling Tools",M9_losses:"Losses"};
+const CLAUSE = {M1_volume_of_stakes:"§5.1",M2_speed_of_play:"§5.2",M3_depositing_behaviour:"§5.3",M4_cancelled_withdrawals:"§5.4",M5_player_initiated_contact:"§5.5",M6_gambling_time:"§5.6",M7_gambling_products:"§5.7",M8_responsible_gambling_tools:"§5.8",M9_losses:"§5.9"};
+
+const players = [...D.players].sort((a,b)=>b.composite.score-a.composite.score || a.playerId.localeCompare(b.playerId));
+document.getElementById("opmeta").innerHTML = `<b>${D.operator}</b> · assessed as of ${D.asOf.slice(0,10)}<br>${players.length} players · EN 18144:2025 markers`;
+
+const bands = {high:0,moderate:0,low:0};
+let cold = 0;
+players.forEach(p=>{bands[p.composite.band]++; cold += p.baseline==="population"?1:0;});
+document.getElementById("kpis").innerHTML = `
+  <div class="kpi"><div class="n">${players.length}</div><div class="l">players scored</div></div>
+  <div class="kpi hi"><div class="n">${bands.high}</div><div class="l">high band</div></div>
+  <div class="kpi mid"><div class="n">${bands.moderate}</div><div class="l">moderate band</div></div>
+  <div class="kpi lo"><div class="n">${bands.low}</div><div class="l">low band</div></div>
+  <div class="kpi"><div class="n">${cold}</div><div class="l">cold start (population baseline)</div></div>`;
+
+let bandFilter = "all", q = "";
+function render(){
+  const tb = document.getElementById("rows"); tb.innerHTML = "";
+  players.filter(p => (bandFilter==="all"||p.composite.band===bandFilter) && p.playerId.includes(q))
+    .forEach(p=>{
+      const tr = document.createElement("tr"); tr.className = "row"; tr.dataset.pid = p.playerId;
+      tr.innerHTML = `
+        <td><div class="pid">${p.playerId}</div><div class="arch">${p.archetype}</div></td>
+        <td><span class="band ${p.composite.band}">${p.composite.band.toUpperCase()}</span></td>
+        <td><span class="score">${p.composite.score}</span></td>
+        <td><div class="mstrip">${MIDS.map((m,i)=>`<div class="mcell ${p.markers[m].state}" title="M${i+1} ${MNAMES[m]}: ${p.markers[m].state}">${i+1}</div>`).join("")}</div></td>
+        <td><span class="bl">${p.baseline}</span></td>
+        <td><span class="bl">${p.eventCount.toLocaleString()}</span></td>`;
+      tr.onclick = ()=>openD(p, tr);
+      tb.appendChild(tr);
+    });
+}
+document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+  document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));
+  c.classList.add("on"); bandFilter = c.dataset.band; render();
+});
+document.getElementById("q").oninput = e=>{q=e.target.value.trim(); render();};
+
+function sparkline(p){
+  const c = document.createElement("canvas"); c.width = 580; c.height = 90; c.style.width="100%";
+  const ctx = c.getContext("2d");
+  const stake = p.series.stake, loss = p.series.loss;
+  const max = Math.max(...stake, 1);
+  const bw = c.width / stake.length;
+  ctx.fillStyle = "#C9D6D2";
+  stake.forEach((v,i)=>{const h=v/max*70; ctx.fillRect(i*bw, 82-h, bw-1, h);});
+  ctx.strokeStyle = "#A4372E"; ctx.lineWidth = 1.4; ctx.beginPath();
+  const lmax = Math.max(...loss.map(Math.abs), 1);
+  loss.forEach((v,i)=>{const y = 45 - (v/lmax)*38; i?ctx.lineTo(i*bw+bw/2,y):ctx.moveTo(bw/2,y);});
+  ctx.stroke();
+  return c;
+}
+
+function openD(p, tr){
+  document.querySelectorAll("tr.row").forEach(r=>r.classList.remove("sel"));
+  if (tr) tr.classList.add("sel");
+  document.getElementById("dpid").textContent = p.playerId;
+  document.getElementById("dsub").textContent = `baseline: ${p.baseline} · window ${p.windowDays}d · archetype: ${p.archetype}`;
+  const b = document.getElementById("dbody");
+  const pts = p.composite.points.map(x=>`+${x.points}&nbsp; <b>${x.source}</b>`).join("<br>") || "no points — all markers normal";
+  const gaps = p.composite.coverageGaps.length ? `<div class="miss">coverage gaps: ${p.composite.coverageGaps.join(", ")}</div>` : "";
+  const prot = p.protectiveSignals.length ? `<div class="prot">protective signals: ${p.protectiveSignals.join(" · ")}</div>` : "";
+  b.innerHTML = `<div class="note">${p.note||""}</div>
+    <div class="comp"><div class="row1"><span class="cs">${p.composite.score}</span><span class="band ${p.composite.band}">${p.composite.band.toUpperCase()}</span></div>
+    <div class="pts">${pts}</div>${gaps}</div>${prot}
+    <div class="spark"><div class="l">90 days · stake (bars) · net loss (line)</div><div id="sp"></div></div>
+    ${MIDS.map(m=>{
+      const r = p.markers[m];
+      const ev = r.evidence.length?`<div class="ev">${r.evidence.join("<br>")}</div>`:"";
+      const miss = r.missing?`<div class="miss">missing: ${r.missing.join("; ")}</div>`:"";
+      return `<div class="mk state-${r.state}"><div class="h"><span class="nm">${MNAMES[m]} <span class="cl">${CLAUSE[m]}</span></span><span class="band ${r.state==="high"?"high":r.state==="elevated"?"moderate":"low"}">${r.state.replace("_"," ").toUpperCase()}</span></div>${ev}${miss}</div>`;
+    }).join("")}`;
+  document.getElementById("sp").appendChild(sparkline(p));
+  document.getElementById("drawer").classList.add("open");
+}
+function closeD(){document.getElementById("drawer").classList.remove("open");document.querySelectorAll("tr.row").forEach(r=>r.classList.remove("sel"));}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeD();});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,289 @@
+openapi: 3.1.0
+info:
+  title: MarkerLayer API
+  version: 0.2.0
+  description: |
+    Ingestion and scoring API for the MarkerLayer engine — a
+    deterministic reference implementation of EN 18144:2025 (Online gambling —
+    Markers of harm), verified against the full standard text.
+
+    Send behavioural events; receive the nine standardized markers per player,
+    each with named features, an attention state, plain-language evidence, and
+    a point-based composite per §4.2. The engine outputs identification
+    signals only — intervention decisions remain the operator's regulated
+    responsibility, and nothing here is a clinical assessment.
+servers:
+  - url: http://localhost:3200
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Liveness probe (no auth)
+      security: []
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+  /v1/events:
+    post:
+      summary: Ingest a batch of behavioural events
+      description: |
+        Idempotent by eventId — resubmitting a batch is safe and reports
+        duplicates instead of double-counting. A batch containing any invalid
+        event is rejected atomically with per-index error details.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/Event' }
+      responses:
+        '202':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: integer }
+                  duplicates: { type: integer }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { description: Body exceeds the configured size limit }
+  /v1/players:
+    get:
+      summary: List players with ingested events
+      responses:
+        '200':
+          description: Player IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  players:
+                    type: array
+                    items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/players/{playerId}/markers:
+    get:
+      summary: Compute the nine EN 18144 markers and composite for a player
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: asOf
+          in: query
+          required: false
+          description: Deterministic evaluation instant (ISO 8601). Defaults to now.
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Marker assessment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlayerMarkers' }
+        '400': { description: Invalid asOf }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No events for this player }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Operator API key (≥16 characters), compared in constant time.
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+    ValidationError:
+      description: One or more events failed structural validation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    index: { type: integer, description: Position in the batch }
+                    error: { type: string }
+  schemas:
+    Event:
+      type: object
+      required: [eventId, type, playerId, occurredAt, tzOffsetMinutes, payload]
+      properties:
+        eventId:
+          type: string
+          description: Idempotency key (UUID recommended). Duplicates are discarded.
+        type:
+          type: string
+          enum: [wager, deposit, withdrawal, session, support_contact, safety_tool, bonus]
+        playerId:
+          type: string
+          description: Operator-side pseudonymous ID. Never PII.
+        occurredAt:
+          type: string
+          format: date-time
+          description: When the behaviour happened (UTC), not when sent.
+        tzOffsetMinutes:
+          type: [number, 'null']
+          description: >
+            Player-local UTC offset at event time. null suppresses
+            time-of-day analysis rather than guessing.
+        payload:
+          oneOf:
+            - $ref: '#/components/schemas/WagerPayload'
+            - $ref: '#/components/schemas/DepositPayload'
+            - $ref: '#/components/schemas/WithdrawalPayload'
+            - $ref: '#/components/schemas/SessionPayload'
+            - $ref: '#/components/schemas/SupportContactPayload'
+            - $ref: '#/components/schemas/SafetyToolPayload'
+            - $ref: '#/components/schemas/BonusPayload'
+    WagerPayload:
+      type: object
+      required: [stakeMinor, currency, payoutMinor, product]
+      properties:
+        stakeMinor: { type: integer, minimum: 0, description: Minor currency units }
+        currency: { type: string, description: ISO 4217 }
+        payoutMinor: { type: integer, minimum: 0, description: 0 for a loss; settled wagers only }
+        product:
+          type: string
+          enum: [slots, casino_table, live_casino, sports_prematch, sports_live, poker, bingo, lottery, other]
+        gameId: { type: string }
+        sessionId: { type: string }
+    DepositPayload:
+      type: object
+      required: [amountMinor, currency, status]
+      properties:
+        amountMinor: { type: integer, minimum: 0 }
+        currency: { type: string }
+        status:
+          type: string
+          enum: [succeeded, failed, declined]
+          description: Failed/declined attempts are marker inputs (§5.3.2) — send them.
+        methodClass:
+          type: string
+          enum: [card, bank, wallet, voucher, crypto, other]
+    WithdrawalPayload:
+      type: object
+      required: [amountMinor, currency, status, withdrawalId]
+      properties:
+        amountMinor: { type: integer, minimum: 0 }
+        currency: { type: string }
+        status:
+          type: string
+          enum: [requested, cancelled_by_player, completed, rejected]
+        withdrawalId: { type: string, description: Links lifecycle transitions }
+    SessionPayload:
+      type: object
+      required: [status, sessionId]
+      properties:
+        status: { type: string, enum: [started, ended] }
+        sessionId: { type: string }
+    SupportContactPayload:
+      type: object
+      required: [channel]
+      properties:
+        channel: { type: string, enum: [chat, email, phone, other] }
+        sentiment:
+          type: string
+          enum: [positive, neutral, negative]
+          description: Categorization per §5.5.2. No free text is ever ingested.
+        category:
+          type: string
+          enum: [payments, bonuses, responsible_gambling, complaint, account, other]
+    SafetyToolPayload:
+      type: object
+      required: [tool, action]
+      properties:
+        tool:
+          type: string
+          enum: [deposit_limit, loss_limit, wager_limit, session_limit, reality_check, time_out, self_exclusion]
+        action:
+          type: string
+          enum: [set, lowered, raised, removed, expired, revoked]
+          description: For self_exclusion, "set" is an activation (§5.8.2).
+        valueMinor: { type: integer, minimum: 0 }
+        valueMinutes: { type: integer, minimum: 0 }
+    BonusPayload:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [claimed, wagering_completed, forfeited] }
+        amountMinor: { type: integer, minimum: 0 }
+    MarkerResult:
+      type: object
+      required: [state, features, evidence]
+      properties:
+        state:
+          type: string
+          enum: [normal, elevated, high, insufficient_data]
+        features:
+          type: object
+          additionalProperties: { type: [number, 'null'] }
+        evidence:
+          type: array
+          items: { type: string }
+          description: Every non-normal state names the feature, value, and rule.
+        missing:
+          type: array
+          items: { type: string }
+    CompositeResult:
+      type: object
+      required: [score, band, points, coverageGaps]
+      properties:
+        score: { type: number }
+        band: { type: string, enum: [low, moderate, high] }
+        points:
+          type: array
+          description: Explainable breakdown; sums exactly to score.
+          items:
+            type: object
+            properties:
+              source: { type: string }
+              points: { type: number }
+        coverageGaps:
+          type: array
+          items: { type: string }
+    PlayerMarkers:
+      type: object
+      required: [playerId, computedAt, windowDays, baseline, markers, attention, composite, protectiveSignals]
+      properties:
+        playerId: { type: string }
+        computedAt: { type: string, format: date-time }
+        windowDays: { type: integer }
+        baseline:
+          type: string
+          enum: [self, population]
+        markers:
+          type: object
+          description: All nine EN 18144 §5.1–§5.9 markers, always present.
+          properties:
+            M1_volume_of_stakes: { $ref: '#/components/schemas/MarkerResult' }
+            M2_speed_of_play: { $ref: '#/components/schemas/MarkerResult' }
+            M3_depositing_behaviour: { $ref: '#/components/schemas/MarkerResult' }
+            M4_cancelled_withdrawals: { $ref: '#/components/schemas/MarkerResult' }
+            M5_player_initiated_contact: { $ref: '#/components/schemas/MarkerResult' }
+            M6_gambling_time: { $ref: '#/components/schemas/MarkerResult' }
+            M7_gambling_products: { $ref: '#/components/schemas/MarkerResult' }
+            M8_responsible_gambling_tools: { $ref: '#/components/schemas/MarkerResult' }
+            M9_losses: { $ref: '#/components/schemas/MarkerResult' }
+        attention:
+          type: array
+          items: { type: string }
+          description: Marker IDs with state ≥ elevated, ordered by severity.
+        composite: { $ref: '#/components/schemas/CompositeResult' }
+        protectiveSignals:
+          type: array
+          items: { type: string }
