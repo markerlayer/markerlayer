@@ -1,6 +1,6 @@
 {
   "name": "markerlayer",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Deterministic reference implementation of the EN 18144:2025 behavioural markers of harm for online gambling",
   "license": "MIT",
   "author": "DUOMIND S.R.L.",
