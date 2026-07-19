@@ -8,7 +8,6 @@ import type { MarkerResult } from '../schema.js';
 import { dailySeries, sumOverDays, trajectorySeries, type PlayerHistory } from '../history.js';
 import { coefficientOfVariation, olsSlope } from '../stats.js';
 import { thresholdsFor } from '../config.js';
-import { DAY_MS } from '../time.js';
 import { type MarkerCtx, fmt, insufficient, override, result, zState } from './shared.js';
 
 /**

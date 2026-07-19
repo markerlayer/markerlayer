@@ -10,7 +10,7 @@ import type { MarkerResult } from '../schema.js';
 import { dailySeries, eventMs, sumOverDays, windowEvents } from '../history.js';
 import { median } from '../stats.js';
 import { thresholdsFor } from '../config.js';
-import { DAY_MS, HOUR_MS, MINUTE_MS } from '../time.js';
+import { HOUR_MS, MINUTE_MS } from '../time.js';
 import { type MarkerCtx, insufficient, override, result, zState } from './shared.js';
 
 export function computeM3(ctx: MarkerCtx): MarkerResult {
